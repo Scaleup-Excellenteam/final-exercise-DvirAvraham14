@@ -5,23 +5,22 @@ class PowerPointReader:
     def __init__(self, file_path):
         self.presentation = Presentation(file_path)
 
-
     def clean_text(self, text):
         # Remove leading/trailing whitespace and unnecessary characters
-        cleaned_text = re.sub(r'\s+', ' ', text).strip()
-        return cleaned_text
+        return re.sub(r'\s+', ' ', text).strip()
 
     def prepare_prompts(self):
-        prompts = []
+        """
+        Parses the PowerPoint presentation and returns a list of slide contents
+        after cleaning the text.
+        """
         for slide in self.presentation.slides:
-            slide_data = []
+            slide_text = ""
             for shape in slide.shapes:
                 if shape.has_text_frame:
                     for paragraph in shape.text_frame.paragraphs:
                         for run in paragraph.runs:
-                            cleaned_text = self.clean_text(run.text)
-                            if cleaned_text:
-                                slide_data.append(cleaned_text)
-            prompt = ' '.join(slide_data)
-            prompts.append(prompt)
-        return prompts
+                            slide_text += run.text + "\n"
+            yield self.clean_text(slide_text)
+
+
