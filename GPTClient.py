@@ -4,6 +4,7 @@ from dotenv import dotenv_values
 from typing import List
 from tenacity import retry, wait_random_exponential, stop_after_attempt
 import loggerManger
+from tqdm import tqdm
 
 
 class GPTClient:
@@ -29,10 +30,11 @@ class GPTClient:
         return formatted_prompts
 
     @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(1))
-    async def generate_summary(self, prompt):
+    async def generate_summary(self, prompt, progress_bar=None):
         """
         Generate the summary from the GPT-3.5 turbo model
         :param prompt: the prompt to send to the GPT-3.5 turbo model
+        :param progress_bar: progress bar to update (optional)
         :return: the summary from the GPT-3.5 turbo model
         """
         try:
@@ -44,6 +46,10 @@ class GPTClient:
                 ]
             )
             await asyncio.sleep(1)
+
+            if progress_bar is not None:
+                progress_bar.update(1)
+
             return chat_response["choices"][0]["message"]["content"]
 
         except openai.error as e:
@@ -57,4 +63,3 @@ if __name__ == '__main__':
     gptClient = GPTClient()
     response = asyncio.run(gptClient.generate_summary("Explain me that is python language?"))
     print(response)
-
