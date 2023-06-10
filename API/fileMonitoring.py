@@ -9,8 +9,10 @@ from watchdog.events import FileSystemEventHandler
 
 load_dotenv()
 
-UPLOAD_DIRECTORY = os.environ.get('UPLOAD_FOLDER')
-OUTPUT_DIRECTORY = os.environ.get('OUTPUT_FOLDER')
+MAIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+UPLOAD_DIRECTORY = os.path.join(MAIN_DIR, os.environ.get('UPLOAD_FOLDER'))
+OUTPUT_DIRECTORY = os.path.join(MAIN_DIR, os.environ.get('OUTPUT_FOLDER'))
+explainer = os.path.join(MAIN_DIR, "main.py")
 
 
 class FileHandler(FileSystemEventHandler):
@@ -28,11 +30,10 @@ async def process_pending_file(file_path):
     file_name = os.path.basename(file_path)
     file_name_parts = file_name.split("_")
     uid = file_name_parts[-1].split(".")[0]
-    print(OUTPUT_DIRECTORY)
     output_path = f"{OUTPUT_DIRECTORY}/done_{uid}.json"
 
     try:
-        process = await asyncio.create_subprocess_exec("python3", "main.py", file_path, output_path)
+        process = await asyncio.create_subprocess_exec("python3", explainer, file_path, output_path)
         await process.communicate()
 
         if os.path.exists(output_path):
