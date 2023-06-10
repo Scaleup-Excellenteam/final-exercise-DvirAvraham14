@@ -4,11 +4,16 @@ import uuid
 from datetime import datetime
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
+import json
+import subprocess
+from collections import OrderedDict
+
 
 load_dotenv()
 app = Flask(__name__)
 # UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = os.environ.get('UPLOAD_FOLDER')
+MAIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+app.config['UPLOAD_FOLDER'] = os.path.join(MAIN_DIR, "uploads")
 
 
 @app.route('/add', methods=['POST'])
@@ -47,11 +52,42 @@ def get_file_status(uuid):
     for file in os.listdir(app.config['UPLOAD_FOLDER']):
         if uuid in file:
             if file.startswith("pending"):
-                return jsonify({'message': 'File is pending'}), 200
+                filename = file.split('_', 1)[1].split('.')[0]
+                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                return jsonify(OrderedDict([
+                    ('status', 'pending'),
+                    ('filename', filename),
+                    ('timestamp', timestamp),
+                    ('explanation', None)
+                ])), 200
             elif file.startswith("done"):
-                return jsonify({'message': 'File is done'}), 200
-        else:
-            return jsonify({'message': 'File not found'}), 404
+                filename = file.split('_', 2)[1]
+                timestamp = file.split('_', 2)[2].split('.')[0]
+                return jsonify(OrderedDict([
+                    ('status', 'done'),
+                    ('filename', filename),
+                    ('timestamp', timestamp),
+                    ('explanation', get_explanation(uuid))
+                ])), 200
+    return jsonify({'status': 'not found'}), 404
+
+
+def get_explanation(uuid) -> object:
+    """
+    Retrieve the processed output explanation for the given UUID.
+    This function retrieves the explanation from the corresponding JSON file.
+
+    :param uuid: the unique identifier of the file
+    :return: the processed output explanation if available, or None
+    """
+    explanation_file_path = f"{os.environ.get('OUTPUT_FOLDER')}/done_{uuid}.json"
+    print(explanation_file_path)
+    if os.path.exists(explanation_file_path):
+        with open(explanation_file_path, 'r') as json_file:
+            explanation_data = json.load(json_file)
+            return explanation_data
+    return None
+
 def generate_unique_filename(file) -> (str, str):
     """Generate a new unique file name.
 
@@ -69,14 +105,11 @@ def generate_unique_filename(file) -> (str, str):
     new_filename = f"pending_{filename}_{timestamp}_{uid}{file_ext}"
     return uid, new_filename
 
-
-def create_folders_if_not_exists():
-    if not os.path.exists(os.environ.get('UPLOAD_FOLDER')):
-        os.mkdir(os.environ.get('UPLOAD_FOLDER'))
-    if not os.path.exists(os.environ.get('OUTPUT_FOLDER')):
-        os.mkdir(os.environ.get('OUTPUT_FOLDER'))
+def run_file_monitoring_script():
+    file_monitoring_script = os.path.join(os.path.dirname(__file__), "fileMonitoring.py")
+    subprocess.Popen(["python3", file_monitoring_script])
 
 
 if __name__ == '__main__':
-    create_folders_if_not_exists()
+    run_file_monitoring_script()
     app.run(debug=True)
