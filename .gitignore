@@ -1,0 +1,7 @@
+.idea
+__pycache__
+.env
+pres.pptx
+output.json
+/logs
+controller.py
