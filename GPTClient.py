@@ -1,12 +1,13 @@
 import openai
+import os
 import asyncio
-from dotenv import dotenv_values
+from dotenv import load_dotenv
 from typing import List
 from tenacity import retry, wait_random_exponential, stop_after_attempt
 import loggerManger
 from tqdm import tqdm
 
-
+load_dotenv()
 class GPTClient:
     def __init__(self):
         """
@@ -14,7 +15,7 @@ class GPTClient:
         set the question to ask the GPT-3.5 turbo model
         TODO: adding more question to ask the GPT-3.5 turbo model
         """
-        openai.api_key = dotenv_values(".env")["OPENAI_API_KEY"]  # set the openai api key
+        openai.api_key = os.environ.get("OPENAI_API_KEY")  # set the openai api key
         self.question = [
             "Summarize the following slide that I can understand it and learn from\
              it, give me the main points of the slide and examples if needed:"
