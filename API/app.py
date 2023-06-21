@@ -7,11 +7,12 @@ from werkzeug.utils import secure_filename
 import json
 import subprocess
 from collections import OrderedDict
-
+from DB.engine import Upload, User, session
+from flask import Flask, request, jsonify
+from DB.engine import Upload, User, session
 
 load_dotenv()
 app = Flask(__name__)
-# UPLOAD_FOLDER = 'uploads'
 MAIN_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 app.config['UPLOAD_FOLDER'] = os.path.join(MAIN_DIR, "uploads")
 
@@ -32,12 +33,29 @@ def add_file():
     if file.filename == '':
         return jsonify({'message': 'No selected file'}), 400
 
-    uuid, filename = generate_unique_filename(file)
-    save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(save_path)
-    return jsonify({'message': 'File uploaded successfully',
-                    'uuid': uuid}), 200
+    email = request.form.get('email')
+    user_id = None  # Initialize user_id as None
 
+    if email:
+        user = session.query(User).filter_by(email=email).first()
+        if not user:
+            # Create a new user if it doesn't exist
+            user = User(email=email)
+            session.add(user)
+            session.commit()
+        user_id = user.id  # Assign the user ID
+
+    uid, filename = generate_unique_filename(file)
+    try:
+        upload = Upload(filename=filename, uid=uid, user_id=user_id)
+        session.add(upload)
+        session.commit()
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file.save(save_path)
+    except Exception as e:
+        return jsonify({'message': e}), 500
+    return jsonify({'message': 'File uploaded successfully',
+                    'uuid': uid}), 200
 
 @app.route('/get/<uuid>', methods=['GET'])
 def get_file_status(uuid):
@@ -49,30 +67,22 @@ def get_file_status(uuid):
     :param uuid: the unique identifier of the file
     :return: the status of the file
     """
-    for file in os.listdir(app.config['UPLOAD_FOLDER']):
-        if uuid in file:
-            if file.startswith("pending"):
-                filename = file.split('_', 1)[1].split('.')[0]
-                timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                return jsonify(OrderedDict([
-                    ('status', 'pending'),
-                    ('filename', filename),
-                    ('timestamp', timestamp),
-                    ('explanation', None)
-                ])), 200
-            elif file.startswith("done"):
-                filename = file.split('_', 2)[1]
-                timestamp = file.split('_', 2)[2].split('.')[0]
-                return jsonify(OrderedDict([
-                    ('status', 'done'),
-                    ('filename', filename),
-                    ('timestamp', timestamp),
-                    ('explanation', get_explanation(uuid))
-                ])), 200
+    file = session.query(Upload).filter(Upload.uid == uuid).first()
+    if not file:
+        return jsonify({'status': 'not found'}), 404
+    else:
+        return jsonify({
+            'status': file.status,
+            'filename': file.filename,
+            'upload_on': file.upload_time,
+            'finish_on': file.finish_time,
+            'explanation': None if file.status != 'done' else get_explanation(file.filename.split('.')[0])
+        }), 200
+
     return jsonify({'status': 'not found'}), 404
 
 
-def get_explanation(uuid) -> object:
+def get_explanation(filename) -> object:
     """
     Retrieve the processed output explanation for the given UUID.
     This function retrieves the explanation from the corresponding JSON file.
@@ -80,13 +90,15 @@ def get_explanation(uuid) -> object:
     :param uuid: the unique identifier of the file
     :return: the processed output explanation if available, or None
     """
-    explanation_file_path = f"{os.environ.get('OUTPUT_FOLDER')}/done_{uuid}.json"
+    print(filename)
+    explanation_file_path = os.path.join(MAIN_DIR, os.environ.get('OUTPUT_FOLDER'), f"{filename}.json")
     print(explanation_file_path)
     if os.path.exists(explanation_file_path):
         with open(explanation_file_path, 'r') as json_file:
             explanation_data = json.load(json_file)
             return explanation_data
     return None
+
 
 def generate_unique_filename(file) -> (str, str):
     """Generate a new unique file name.
@@ -99,11 +111,11 @@ def generate_unique_filename(file) -> (str, str):
     """
     uid = str(uuid.uuid4())
     split_filename = os.path.splitext(secure_filename(file.filename))
-    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     filename = secure_filename(split_filename[0])
     file_ext = split_filename[1]
-    new_filename = f"pending_{filename}_{timestamp}_{uid}{file_ext}"
+    new_filename = f"{filename}_{uid}{file_ext}"
     return uid, new_filename
+
 
 def run_file_monitoring_script():
     file_monitoring_script = os.path.join(os.path.dirname(__file__), "fileMonitoring.py")

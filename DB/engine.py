@@ -53,14 +53,3 @@ Session = sessionmaker(bind=engine)
 
 session = Session()
 
-if __name__ == '__main__':
-    try:
-        file1 = Upload(uid=str(uuid.uuid4()), filename="test1.pptx")
-        file2 = Upload(uid=str(uuid.uuid4()), filename="test2.pptx")
-        file3 = Upload(uid=str(uuid.uuid4()), filename="test3.pptx")
-
-        session.add_all([file1, file2, file3])
-        session.commit()
-
-    except Exception as e:
-        print(e)

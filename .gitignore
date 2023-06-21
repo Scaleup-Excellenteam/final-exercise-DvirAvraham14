@@ -4,3 +4,6 @@ __pycache__
 pres.pptx
 output.json
 /logs
+/outputs
+/uploads
+/API/logs

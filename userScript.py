@@ -7,9 +7,12 @@ load_dotenv()
 
 BASE_URL = os.environ.get('SERVER_HOST')
 local = "/Users/dviravraham/PycharmProjects/final-exercise-DvirAvraham14/pres.pptx"
-def send_request_with_file(file_path):
-    with open(file_path, 'rb') as file:
-        response = requests.post(BASE_URL + '/add', files={'upload_file': file})
+def send_request_with_file(command: str):
+    command = command.split(' ')
+    with open(command[0], 'rb') as file:
+        if(len(command) == 2):
+            email = command[1]
+        response = requests.post(BASE_URL + '/add', files={'upload_file': file}, data={'email': email})
         if response.status_code == 200:
             response_mess = response.json()
             return response_mess
